@@ -1,0 +1,99 @@
+﻿<Window x:Class="CybersecurityChatbot.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cybersecurity Awareness Assistant"
+        Height="700"
+        Width="950"
+        WindowStartupLocation="CenterScreen"
+        Background="#0B1F33">
+
+    <Grid Margin="15">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="120"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="90"/>
+        </Grid.RowDefinitions>
+
+        <!-- HEADER -->
+        <Border Grid.Row="0"
+                Background="#102A43"
+                CornerRadius="15"
+                Padding="15"
+                Margin="0,0,0,10">
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+
+                <!-- LOGO -->
+                <Image Source="logo.png"
+                       Width="70"
+                       Height="70"
+                       Margin="0,0,15,0"/>
+
+                <!-- TITLE -->
+                <StackPanel>
+
+                    <TextBlock Text="MY CYBERSECURITY AWARENESS ASSISTANT"
+                               Foreground="Blue"
+                               FontSize="28"
+                               FontWeight="Bold"/>
+
+                    <TextBlock Text="Stay Safe Online"
+                               Foreground="White"
+                               FontSize="16"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- CHAT AREA -->
+        <Border Grid.Row="1"
+                Background="#13293D"
+                CornerRadius="15"
+                Padding="15">
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+
+                <TextBlock x:Name="ChatDisplay"
+                           Foreground="White"
+                           FontSize="18"
+                           TextWrapping="Wrap"/>
+            </ScrollViewer>
+        </Border>
+
+        <!-- INPUT -->
+        <Border Grid.Row="2"
+                Background="#102A43"
+                CornerRadius="15"
+                Margin="0,10,0,0"
+                Padding="10">
+
+            <Grid>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="160"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox x:Name="UserInput"
+                         Grid.Column="0"
+                         Height="50"
+                         FontSize="18"
+                         Padding="10"
+                         KeyDown="UserInput_KeyDown"/>
+
+                <Button x:Name="SendButton"
+                        Grid.Column="1"
+                        Content="SEND"
+                        Background="Red"
+                        Foreground="White"
+                        FontSize="18"
+                        FontWeight="Bold"
+                        Margin="10,0,0,0"
+                        Click="SendButton_Click"/>
+            </Grid>
+        </Border>
+
+    </Grid>
+</Window>
