@@ -9,10 +9,13 @@ namespace CybersecurityChatbot
         private SentimentDetector _sentiment;
         private MemoryStore _memory;
 
+        private TaskManager _taskManager;
+        private QuizManager _quizManager;
+        private NlpProcessor _nlpProcessor;
+
+        private bool _quizRunning = false;
         private bool _awaitingName = true;
         private bool _awaitingStudentNumber = false;
-
-        private string _lastTopic = "";
 
         private Random _random = new Random();
 
@@ -21,6 +24,10 @@ namespace CybersecurityChatbot
             _keywords = new KeywordResponder();
             _sentiment = new SentimentDetector();
             _memory = new MemoryStore();
+
+            _taskManager = new TaskManager();
+            _quizManager = new QuizManager();
+            _nlpProcessor = new NlpProcessor();
         }
 
         public string GetGreeting()
@@ -34,15 +41,12 @@ namespace CybersecurityChatbot
         {
             input = input.Trim();
 
-            // ASK FOR NAME
             if (_awaitingName)
             {
                 _memory.UserName = input;
-
                 _memory.Store("name", input);
 
                 _awaitingName = false;
-
                 _awaitingStudentNumber = true;
 
                 return
@@ -50,11 +54,9 @@ namespace CybersecurityChatbot
                     "Please enter your STUDENT NUMBER:";
             }
 
-            // ASK FOR STUDENT NUMBER
             if (_awaitingStudentNumber)
             {
                 _memory.StudentNumber = input;
-
                 _memory.Store("student", input);
 
                 _awaitingStudentNumber = false;
@@ -66,24 +68,173 @@ namespace CybersecurityChatbot
 
             string lowerInput = input.ToLower();
 
-            // REMEMBER NAME
+            ActivityLogger.Add("User input: " + input);
+
+            // QUIZ MODE
+            if (_quizRunning)
+            {
+                if (lowerInput == "true" || lowerInput == "false")
+                {
+                    QuizQuestion question =
+                        _quizManager.Questions[_quizManager.CurrentQuestion];
+
+                    string response;
+
+                    if (lowerInput == question.Answer)
+                    {
+                        _quizManager.Score++;
+
+                        response =
+                            "✔ Correct!\n\n" +
+                            question.Explanation;
+                    }
+                    else
+                    {
+                        response =
+                            "✘ Incorrect.\n\n" +
+                            question.Explanation;
+                    }
+
+                    _quizManager.CurrentQuestion++;
+
+                    if (_quizManager.CurrentQuestion >=
+                        _quizManager.Questions.Count)
+                    {
+                        _quizRunning = false;
+
+                        double percentage =
+                            (double)_quizManager.Score /
+                            _quizManager.Questions.Count * 100;
+
+                        string feedback;
+
+                        if (percentage >= 90)
+                            feedback = "Excellent! Outstanding cybersecurity knowledge.";
+                        else if (percentage >= 70)
+                            feedback = "Good job! Strong cybersecurity awareness.";
+                        else if (percentage >= 50)
+                            feedback = "Fair performance. Keep improving.";
+                        else
+                            feedback = "Needs improvement. Review cybersecurity concepts.";
+
+                        return
+                            response +
+                            "\n\nFINAL SCORE: " +
+                            _quizManager.Score +
+                            "/" +
+                            _quizManager.Questions.Count +
+                            "\n\n" +
+                            feedback;
+                    }
+
+                    response +=
+                        "\n\nQuestion " +
+                        (_quizManager.CurrentQuestion + 1) +
+                        ":\n\n" +
+                        _quizManager.Questions[_quizManager.CurrentQuestion].Question +
+                        "\n\nAnswer True or False.";
+
+                    return response;
+                }
+            }
+
+            // NLP COMMANDS
+            string intent = _nlpProcessor.DetectIntent(lowerInput);
+
+            if (intent == "START_QUIZ")
+            {
+                _quizRunning = true;
+
+                _quizManager.CurrentQuestion = 0;
+                _quizManager.Score = 0;
+
+                ActivityLogger.Add("Quiz started");
+
+                return
+                    "CYBERSECURITY QUIZ\n\nQuestion 1:\n\n" +
+                    _quizManager.Questions[0].Question +
+                    "\n\nAnswer True or False.";
+            }
+
+            if (intent == "ADD_TASK")
+            {
+                _taskManager.AddTask(
+                    "Enable two-factor authentication",
+                    DateTime.Now.AddDays(3));
+
+                return
+                    "Task added successfully.\n\n" +
+                    "Reminder Date: " +
+                    DateTime.Now.AddDays(3).ToShortDateString();
+            }
+
+            if (intent == "SHOW_TASKS")
+            {
+                List<TaskItem> taskList = _taskManager.GetTasks();
+
+                if (taskList.Count == 0)
+                {
+                    return "There are currently no tasks.";
+                }
+
+                string tasks = "CURRENT TASKS:\n\n";
+                foreach (var task in taskList)
+                {
+                    tasks += task + "\n";
+                }
+
+                return tasks;
+            }
+
+            if (intent == "COMPLETE_TASK")
+            {
+                int taskNumber = ExtractTaskNumber(lowerInput);
+
+                _taskManager.CompleteTask(taskNumber);
+
+                return $"Task {taskNumber + 1} marked as completed.";
+            }
+
+            if (intent == "DELETE_TASK")
+            {
+                int taskNumber =
+                    ExtractTaskNumber(lowerInput);
+
+                _taskManager.DeleteTask(taskNumber);
+
+                return
+                    $"Task {taskNumber + 1} deleted.";
+            }
+
+            if (intent == "SHOW_LOG")
+            {
+                string logs = "RECENT ACTIVITY:\n\n";
+
+                foreach (var log in ActivityLogger.GetRecent())
+                {
+                    logs += log + "\n";
+                }
+
+                return logs;
+            }
+
+            // MEMORY
             if (lowerInput.Contains("what is my name"))
             {
                 return
                     $"Your name is {_memory.Recall("name")}.";
             }
 
-            // REMEMBER STUDENT NUMBER
             if (lowerInput.Contains("what is my student number"))
             {
                 return
                     $"Your student number is {_memory.Recall("student")}.";
             }
 
-            // SAD USER
+            // EMOTIONAL RESPONSES
             if (lowerInput.Contains("sad") ||
-                lowerInput.Contains("depressed") ||
-                lowerInput.Contains("upset"))
+                lowerInput.Contains("upset") ||
+                lowerInput.Contains("depressed"))
             {
                 List<string> jokes = new List<string>
                 {
@@ -93,46 +244,7 @@ namespace CybersecurityChatbot
                 };
 
                 return
-                    $"Hey {_memory.UserName}, do not be sad ❤️\n\n" +
                     jokes[_random.Next(jokes.Count)];
-            }
-
-            // ANGRY USER
-            if (lowerInput.Contains("angry"))
-            {
-                return
-                    "Take a deep breath 😊\n" +
-                    "Even computers freeze sometimes.";
-            }
-
-            // TIRED USER
-            if (lowerInput.Contains("tired"))
-            {
-                return
-                    "You should rest 😴\n" +
-                    "Cybersecurity experts need sleep too.";
-            }
-
-            // FOLLOW-UP
-            if (lowerInput.Contains("tell me more") ||
-                lowerInput.Contains("explain more"))
-            {
-                return GetFollowUpResponse();
-            }
-
-            // STORE INTEREST
-            if (lowerInput.Contains("interested in"))
-            {
-                foreach (string keyword in _keywords.GetAllKeywords())
-                {
-                    if (lowerInput.Contains(keyword))
-                    {
-                        _memory.FavouriteTopic = keyword;
-
-                        return
-                            $"I will remember that you are interested in {keyword}.";
-                    }
-                }
             }
 
             // SENTIMENT
@@ -142,113 +254,61 @@ namespace CybersecurityChatbot
             string sentimentText =
                 _sentiment.GetSentimentResponse(detected);
 
-            // KEYWORD RESPONSE
+            // KEYWORDS
             string keywordResponse =
                 _keywords.GetResponse(lowerInput);
 
             if (keywordResponse != null)
             {
-                foreach (string keyword in _keywords.GetAllKeywords())
-                {
-                    if (lowerInput.Contains(keyword))
-                    {
-                        _lastTopic = keyword;
-                        break;
-                    }
-                }
-
                 return
-                    sentimentText + "\n" +
-                    _memory.GetPersonalisedOpener() + "\n\n" +
+                    sentimentText +
+                    "\n" +
+                    _memory.GetPersonalisedOpener() +
+                    "\n\n" +
                     keywordResponse;
             }
 
-            // FALLBACK
             return
-                "I can answer cybersecurity questions about:\n\n" +
+                "I can help with:\n\n" +
                 "• Passwords\n" +
                 "• Phishing\n" +
                 "• Malware\n" +
                 "• VPN\n" +
                 "• Privacy\n" +
-                "• Scams\n" +
-                "• Ransomware\n" +
                 "• Firewalls\n" +
-                "• Spyware\n" +
-                "• Viruses\n" +
-                "• Trojans\n" +
                 "• Encryption\n" +
-                "• Hackers\n" +
-                "• Cyberbullying\n" +
-                "• Data Breaches\n" +
-                "• Social Media Safety\n" +
-                "• Two-Factor Authentication\n" +
-                "• Identity Theft\n" +
-                "• Wi-Fi Security\n" +
-                "• Antivirus\n" +
-                "• Online Banking Safety\n" +
-                "• Fake Websites\n\n" +
-                "Ask me any cybersecurity question.";
+                "• Viruses\n" +
+                "• Cybersecurity\n\n" +
+                "Commands:\n" +
+                "• start quiz\n" +
+                "• add task\n" +
+                "• show tasks\n" +
+                "• show activity log";
         }
 
-        private string GetFollowUpResponse()
+
+        public List<TaskItem> GetTasks()
         {
-            switch (_lastTopic)
-            {
-                case "password":
-                    return
-                        "Strong passwords should:\n\n" +
-                        "✔ Be at least 12 characters\n" +
-                        "✔ Include uppercase letters\n" +
-                        "✔ Include symbols and numbers\n" +
-                        "✔ Never be shared";
-
-                case "phishing":
-                    return
-                        "Phishing attacks trick users into revealing passwords or banking details.\n\n" +
-                        "Always verify suspicious emails before clicking links.";
-
-                case "malware":
-                    return
-                        "Malware includes:\n\n" +
-                        "• Viruses\n" +
-                        "• Spyware\n" +
-                        "• Trojans\n" +
-                        "• Ransomware";
-
-                case "vpn":
-                    return
-                        "VPN stands for Virtual Private Network.\n\n" +
-                        "It protects your internet connection and privacy.";
-
-                case "privacy":
-                    return
-                        "Protect your privacy by limiting personal information shared online.";
-
-                case "scam":
-                    return
-                        "Scammers often create urgency to pressure victims.";
-
-                case "firewall":
-                    return
-                        "Firewalls block unauthorized access to your computer or network.";
-
-                case "encryption":
-                    return
-                        "Encryption converts data into secure code to protect information.";
-
-                case "virus":
-                    return
-                        "Computer viruses spread between files and devices.";
-
-                case "spyware":
-                    return
-                        "Spyware secretly monitors user activity.";
-
-                default:
-                    return
-                        "Please ask about a cybersecurity topic first.";
-            }
+            return _taskManager.GetTasks();
         }
+        public int GetQuizProgress()
+        {
+            return _quizManager.CurrentQuestion;
+        }
+        private int ExtractTaskNumber(string input)
+        {
+            string[] parts = input.Split(' ');
+
+            foreach (string part in parts)
+            {
+                if (int.TryParse(part, out int number))
+                {
+                    return number - 1;
+                }
+            }
+
+            return 0;
+        }
+
     }
 }

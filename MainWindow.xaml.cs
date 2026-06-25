@@ -7,7 +7,7 @@ namespace CybersecurityChatbot
     {
         private ChatBot _chatBot;
 
-        public MainWindow()
+    public MainWindow()
         {
             InitializeComponent();
 
@@ -38,26 +38,61 @@ namespace CybersecurityChatbot
                 return;
             }
 
+            // Show user message
             AppendUserMessage(input);
 
-            string response =
-                _chatBot.ProcessInput(input);
+            // Get chatbot response
+            string response = _chatBot.ProcessInput(input);
 
+            // Show bot response
             AppendBotMessage(response);
 
+            // Refresh task and activity panels
+            RefreshTasks();
+            RefreshActivityLog();
+            RefreshQuizProgress();
+
+            // Clear input
             UserInput.Clear();
         }
 
         private void AppendUserMessage(string message)
         {
-            ChatDisplay.Text +=
-                "\nYOU: " + message + "\n";
+            ChatDisplay.Text += "\n✔ YOU: " + message + "\n";
         }
 
         private void AppendBotMessage(string message)
         {
-            ChatDisplay.Text +=
-                "\nBOT: " + message + "\n";
+            ChatDisplay.Text += "\n🤖 BOT: " + message + "\n";
         }
+
+        private void RefreshTasks()
+        {
+            TaskList.Items.Clear();
+
+            foreach (var task in _chatBot.GetTasks())
+            {
+                TaskList.Items.Add(task.ToString());
+            }
+        }
+
+        private void RefreshActivityLog()
+        {
+            ActivityList.Items.Clear();
+
+            foreach (var log in ActivityLogger.GetRecent())
+            {
+                ActivityList.Items.Add(log.ToString());
+            }
+        }
+
+        private void RefreshQuizProgress()
+        {
+            QuizProgressBar.Value =
+                _chatBot.GetQuizProgress();
+        }
+
+
     }
+
 }
